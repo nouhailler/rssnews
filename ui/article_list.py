@@ -31,7 +31,7 @@ import database as db
 ROLE_ARTICLE_ID = Qt.ItemDataRole.UserRole
 
 
-class ArticleListPanel(QWidget):
+class ArticleListPanel(QFrame):
     """
     Panneau liste des articles.
 

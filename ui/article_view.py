@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 import database as db
 
 
-class ArticleView(QWidget):
+class ArticleView(QFrame):
     """
     Panneau d'affichage d'un article.
 

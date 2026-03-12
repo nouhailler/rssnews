@@ -42,7 +42,7 @@ _FEED_ICON = "📄"
 _ERROR_ICON = "⚠"
 
 
-class FeedPanel(QWidget):
+class FeedPanel(QFrame):
     """
     Widget arborescence des flux.
 
@@ -131,11 +131,11 @@ class FeedPanel(QWidget):
         self._unread_counts = db.get_unread_counts_by_feed()
         total_unread = sum(self._unread_counts.values())
 
+        self._tree.blockSignals(True)
         self._tree.clear()
 
         if feeds is None:
             feeds = db.get_all_feeds()
-
         # --- Entrées intelligentes ------------------------------------
         smart_items = self._make_smart_items(total_unread)
         for item in smart_items:
@@ -154,7 +154,7 @@ class FeedPanel(QWidget):
 
         cat_items: dict[str, QTreeWidgetItem] = {}
         for cat in sorted(by_cat.keys()):
-            cat_item = self._make_category_item(cat)
+            cat_item = self._make_category_item(cat, by_cat[cat])
             self._tree.addTopLevelItem(cat_item)
             cat_items[cat] = cat_item
 
@@ -171,6 +171,7 @@ class FeedPanel(QWidget):
         elif saved_type == "feed" and saved_feed_id:
             restored = self._select_feed(saved_feed_id)
 
+        self._tree.blockSignals(False)
         if not restored:
             # Sélectionne "Tous" par défaut
             first = self._tree.topLevelItem(0)
@@ -198,10 +199,8 @@ class FeedPanel(QWidget):
             items.append(item)
         return items
 
-    def _make_category_item(self, category: str) -> QTreeWidgetItem:
+    def _make_category_item(self, category: str, cat_feeds: list) -> QTreeWidgetItem:
         # Calcule le total non-lu de la catégorie
-        feeds = db.get_all_feeds()
-        cat_feeds = [f for f in feeds if f["category"] == category]
         cat_unread = sum(self._unread_counts.get(f["id"], 0) for f in cat_feeds)
 
         label = f"{_CAT_ICON}  {category}"
