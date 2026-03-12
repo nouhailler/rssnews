@@ -40,6 +40,7 @@ import rss_fetcher as fetcher
 from ui.feed_panel    import FeedPanel
 from ui.article_list  import ArticleListPanel
 from ui.article_view  import ArticleView
+from ui.tts_bar       import TTSBar
 from ui.dialogs import (
     AboutDialog,
     AddFeedDialog,
@@ -59,6 +60,7 @@ DEFAULT_SETTINGS = {
     "mark_read_on_open": True,
     "window_geometry":   None,
     "splitter_sizes":    [220, 320, 600],
+    "piper_model_path":  "",
 }
 
 
@@ -136,6 +138,11 @@ class MainWindow(QMainWindow):
         self._splitter.setChildrenCollapsible(False)
 
         layout.addWidget(self._splitter)
+
+        # Barre TTS en bas de la fenêtre
+        self._tts_bar = TTSBar(model_path=self._settings.get("piper_model_path", ""))
+        self._tts_bar.model_path_changed.connect(self._on_tts_model_changed)
+        layout.addWidget(self._tts_bar)
 
     def _build_menu(self):
         menubar = self.menuBar()
@@ -238,6 +245,15 @@ class MainWindow(QMainWindow):
         if self._settings.get("mark_read_on_open", True):
             self._article_list.mark_current_as_read()
             self._article_view.mark_as_read()
+
+        # Charge le texte dans la barre TTS
+        art = db.get_article(article_id)
+        if art:
+            content = art.get("content") or art.get("summary") or ""
+            title   = art.get("title") or ""
+            full    = (title + ". " + content).strip() if content else title
+            self._tts_bar.set_text(full)
+
         # Met à jour les compteurs dans le panneau flux
         self._feed_panel.load()
         # Restaure la sélection de flux
@@ -428,6 +444,10 @@ class MainWindow(QMainWindow):
     # Préférences
     # ------------------------------------------------------------------
 
+    def _on_tts_model_changed(self, path: str):
+        self._settings["piper_model_path"] = path
+        _save_settings(self._settings)
+
     def _on_settings(self):
         dlg = SettingsDialog(self, settings=self._settings)
         if dlg.exec():
@@ -470,6 +490,8 @@ class MainWindow(QMainWindow):
         self._settings["window_geometry"] = bytes(self.saveGeometry().toHex()).decode("ascii")
         self._settings["splitter_sizes"]  = self._splitter.sizes()
         _save_settings(self._settings)
+        # Arrêt propre du TTS
+        self._tts_bar.stop()
         # Arrêt propre du thread de rafraîchissement
         if self._refresh_thread and self._refresh_thread.isRunning():
             self._refresh_thread.wait(3000)
