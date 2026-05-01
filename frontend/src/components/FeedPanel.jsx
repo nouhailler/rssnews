@@ -43,7 +43,7 @@ export default function FeedPanel({ feeds, selection, onSelect, onFeedsChange, o
       <div className="feed-panel-header">
         <span>Flux RSS</span>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button className="btn icon" onClick={onAddFeed} title="Ajouter un flux">＋</button>
+          <button className="btn icon" onClick={() => onAddFeed(null)} title="Ajouter un flux">＋</button>
           <button className="btn icon" onClick={onRefreshAll} disabled={isRefreshing} title="Tout rafraîchir">
             <span className={isRefreshing ? 'spin' : ''}>🔄</span>
           </button>
