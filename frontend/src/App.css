@@ -233,7 +233,7 @@ html, body, #root { height: 100%; overflow: hidden; font-family: var(--font); co
 }
 .article-source-link a { color: var(--accent); }
 
-/* ── TTS Bar ─────────────────────────────────────────────────────────── */
+/* ── TTS Bar (desktop, hors ArticleView) ─────────────────────────────── */
 .tts-bar {
   display: flex;
   align-items: center;
@@ -246,6 +246,18 @@ html, body, #root { height: 100%; overflow: hidden; font-family: var(--font); co
 }
 .tts-bar-label { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
 .tts-speed { width: 56px; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; }
+
+/* ── TTS Bar intégrée dans l'ArticleView ─────────────────────────────── */
+.article-tts-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f0f3f6;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 13px;
+}
 
 /* ── Shared buttons ──────────────────────────────────────────────────── */
 .btn {
@@ -361,17 +373,8 @@ html, body, #root { height: 100%; overflow: hidden; font-family: var(--font); co
   /* Bouton retour visible sur mobile */
   .mobile-back { display: inline-flex; }
 
-  /* TTS cachée sauf quand on lit un article */
+  /* TTS externe cachée sur mobile (elle est intégrée dans l'ArticleView) */
   .tts-bar { display: none; }
-  .app-body[data-mobile-view="article"] ~ .tts-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    font-size: 12px;
-    padding: 6px 10px;
-  }
-  .app-body[data-mobile-view="article"] ~ .tts-bar .btn { font-size: 12px; padding: 4px 10px; }
-  .app-body[data-mobile-view="article"] ~ .tts-bar .tts-speed { font-size: 12px; }
 
   /* Barre de navigation mobile */
   .mobile-nav {
