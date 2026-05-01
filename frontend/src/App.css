@@ -361,8 +361,17 @@ html, body, #root { height: 100%; overflow: hidden; font-family: var(--font); co
   /* Bouton retour visible sur mobile */
   .mobile-back { display: inline-flex; }
 
-  /* TTS cachée — pas de place en portrait */
+  /* TTS cachée sauf quand on lit un article */
   .tts-bar { display: none; }
+  .app-body[data-mobile-view="article"] ~ .tts-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .app-body[data-mobile-view="article"] ~ .tts-bar .btn { font-size: 12px; padding: 4px 10px; }
+  .app-body[data-mobile-view="article"] ~ .tts-bar .tts-speed { font-size: 12px; }
 
   /* Barre de navigation mobile */
   .mobile-nav {
