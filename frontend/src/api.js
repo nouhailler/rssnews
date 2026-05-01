@@ -1,7 +1,32 @@
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// ── Token management ──────────────────────────────────────────────────────
+export const getToken   = () => localStorage.getItem('rss_token')
+export const setToken   = (t) => localStorage.setItem('rss_token', t)
+export const clearToken = () => localStorage.removeItem('rss_token')
+
+export function getUserFromToken() {
+  const token = getToken()
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    if (payload.exp * 1000 < Date.now()) { clearToken(); return null }
+    return { id: parseInt(payload.sub), username: payload.username }
+  } catch { clearToken(); return null }
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, options)
+  const token = getToken()
+  const headers = { ...options.headers }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${BASE}${path}`, { ...options, headers })
+
+  if (res.status === 401) {
+    clearToken()
+    window.dispatchEvent(new Event('auth:logout'))
+    throw new Error('Session expirée.')
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     let detail = body.detail
@@ -18,6 +43,33 @@ const json = (body) => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 })
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+export async function login(username, password) {
+  const res = await fetch(`${BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ username, password }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.detail || 'Identifiants incorrects.')
+  setToken(data.access_token)
+  return data
+}
+
+export async function register(username, password) {
+  const res = await fetch(`${BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.detail || "Erreur lors de l'inscription.")
+  setToken(data.access_token)
+  return data
+}
+
+export function logout() { clearToken() }
 
 // Feeds
 export const getFeeds       = ()           => request('/feeds')
@@ -44,8 +96,19 @@ export const markAllRead    = (feed_id)    => {
 }
 
 // OPML
-export const exportOpmlUrl  = () => `${BASE}/opml/export`
-export const importOpml     = (file) => {
+export async function exportOpml() {
+  const res = await fetch(`${BASE}/opml/export`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  })
+  if (!res.ok) throw new Error('Erreur export OPML')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'flux_rss.opml'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+export const importOpml = (file) => {
   const form = new FormData()
   form.append('file', file)
   return request('/opml/import', { method: 'POST', body: form })

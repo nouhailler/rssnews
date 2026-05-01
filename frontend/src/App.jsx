@@ -3,6 +3,7 @@ import FeedPanel   from './components/FeedPanel.jsx'
 import ArticleList from './components/ArticleList.jsx'
 import ArticleView from './components/ArticleView.jsx'
 import TTSBar      from './components/TTSBar.jsx'
+import LoginPage   from './components/LoginPage.jsx'
 import * as api    from './api.js'
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,7 @@ function OpmlModal({ onClose, onImported }) {
 // App
 // ---------------------------------------------------------------------------
 export default function App() {
+  const [user, setUser]                 = useState(() => api.getUserFromToken())
   const [feeds, setFeeds]               = useState([])
   const [selection, setSelection]       = useState({ type: 'smart', value: 'all' })
   const [selectedArticleId, setSelectedArticleId] = useState(null)
@@ -172,6 +174,15 @@ export default function App() {
   const [mobileView, setMobileView]     = useState('feeds')
 
   const articleListRefreshRef = useRef(null)
+
+  // Listen for 401 → forced logout
+  useEffect(() => {
+    const handler = () => setUser(null)
+    window.addEventListener('auth:logout', handler)
+    return () => window.removeEventListener('auth:logout', handler)
+  }, [])
+
+  if (!user) return <LoginPage onLogin={(u) => setUser(u)} />
 
   const loadFeeds = useCallback(async () => {
     const data = await api.getFeeds()
@@ -228,11 +239,13 @@ export default function App() {
       <div className="toolbar">
         <span className="toolbar-title">📰 RSS Reader</span>
         <button className="btn toolbar-btn" onClick={() => setModal('opml')}>OPML</button>
-        <a href={api.exportOpmlUrl()} download="flux_rss.opml" style={{ textDecoration: 'none' }}>
-          <button className="btn toolbar-btn">⬇ Export</button>
-        </a>
+        <button className="btn toolbar-btn" onClick={() => api.exportOpml().catch(() => {})}>⬇ Export</button>
         <span className="toolbar-sep" />
         {refreshMsg && <span className="toolbar-status">{refreshMsg}</span>}
+        <span style={{ fontSize: 12, color: '#aac' }}>{user.username}</span>
+        <button className="btn toolbar-btn" onClick={() => { api.logout(); setUser(null) }}>
+          Déconnexion
+        </button>
       </div>
 
       {/* Body — data-mobile-view contrôle le panneau visible sur mobile */}

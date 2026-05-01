@@ -480,8 +480,8 @@ def parse_opml(file_path: str) -> list[dict]:
 # Export OPML
 # ---------------------------------------------------------------------------
 
-def export_opml(file_path: str):
-    """Exporte tous les flux vers un fichier OPML."""
+def export_opml(file_path: str, user_id: int | None = None):
+    """Exporte les flux de l'utilisateur vers un fichier OPML."""
     import xml.etree.ElementTree as ET
 
     root = ET.Element("opml", version="2.0")
@@ -492,7 +492,7 @@ def export_opml(file_path: str):
     )
     body = ET.SubElement(root, "body")
 
-    feeds   = db.get_all_feeds()
+    feeds   = db.get_all_feeds(user_id=user_id)
     by_cat: dict[str, list] = {}
     for f in feeds:
         by_cat.setdefault(f["category"], []).append(f)
