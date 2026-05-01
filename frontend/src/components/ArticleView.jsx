@@ -41,9 +41,7 @@ export default function ArticleView({ articleId, onArticleUpdate, onTtsTextChang
 
   const fetchArticle = async (id) => {
     ttsStop()
-    const data = await fetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/articles/${id}`
-    ).then(r => r.json())
+    const data = await api.getArticle(id)
     setArticle(data)
     const text = ((data.title || '') + '. ' + (data.content || data.summary || '')).trim()
     onTtsTextChange(text)

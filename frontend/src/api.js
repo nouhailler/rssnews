@@ -82,6 +82,7 @@ export const refreshAll     = ()           => request('/refresh', { method: 'POS
 export const discoverFeed   = (url)        => request('/feeds/discover', { method: 'POST', ...json({ url }) })
 
 // Articles
+export const getArticle     = (id)          => request(`/articles/${id}`)
 export const getArticles    = (params = {}) => {
   const qs = new URLSearchParams()
   if (params.feed_id != null) qs.set('feed_id', params.feed_id)
