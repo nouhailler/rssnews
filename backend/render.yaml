@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: rssnews-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: RSS_DB_PATH
+        value: /data/rss_reader.db
+    disk:
+      name: rss-data
+      mountPath: /data
+      sizeGB: 1
