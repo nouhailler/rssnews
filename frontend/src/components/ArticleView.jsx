@@ -20,7 +20,7 @@ function formatDate(str) {
   } catch { return str.slice(0, 16) }
 }
 
-export default function ArticleView({ articleId, onArticleUpdate, onTtsTextChange }) {
+export default function ArticleView({ articleId, onArticleUpdate, onTtsTextChange, onBack }) {
   const [article, setArticle] = useState(null)
   const [fontSize, setFontSize] = useState(15)
 
@@ -77,6 +77,9 @@ export default function ArticleView({ articleId, onArticleUpdate, onTtsTextChang
   return (
     <div className="article-view">
       <div className="article-view-bar">
+        {onBack && (
+          <button className="btn icon mobile-back" onClick={onBack} title="Retour">‹ Retour</button>
+        )}
         <button
           className={`btn ${article.favorite ? 'active' : ''}`}
           onClick={toggleFavorite}

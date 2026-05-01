@@ -20,10 +20,7 @@ function FeedModal({ feed, categories, onClose, onSaved }) {
     setDetecting(true)
     setHint({ msg: 'Vérification…', type: '' })
     try {
-      const res = await api.discoverFeed(url).catch(async () => {
-        // fallback: treat url as direct feed
-        return null
-      })
+      const res = await api.discoverFeed(url).catch(() => null)
       if (res) {
         setHint({ msg: `Flux détecté : « ${res.title || url} »`, type: 'ok' })
         if (!name) setName(res.title || '')
@@ -169,8 +166,10 @@ export default function App() {
   const [ttsText, setTtsText]           = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshMsg, setRefreshMsg]     = useState('')
-  const [modal, setModal]               = useState(null)  // null | 'add-feed' | 'edit-feed' | 'opml'
+  const [modal, setModal]               = useState(null)
   const [editFeed, setEditFeed]         = useState(null)
+  // Navigation mobile : 'feeds' | 'articles' | 'article'
+  const [mobileView, setMobileView]     = useState('feeds')
 
   const articleListRefreshRef = useRef(null)
 
@@ -180,6 +179,16 @@ export default function App() {
   }, [])
 
   useEffect(() => { loadFeeds() }, [])
+
+  const handleFeedSelect = (sel) => {
+    setSelection(sel)
+    setMobileView('articles')   // bascule automatiquement sur mobile
+  }
+
+  const handleArticleSelect = (article) => {
+    setSelectedArticleId(article.id)
+    setMobileView('article')    // bascule automatiquement sur mobile
+  }
 
   const handleRefreshAll = async () => {
     setIsRefreshing(true)
@@ -218,22 +227,20 @@ export default function App() {
       {/* Toolbar */}
       <div className="toolbar">
         <span className="toolbar-title">📰 RSS Reader</span>
-        <button className="btn" style={{ color: 'white', borderColor: '#456', background: 'transparent' }} onClick={() => setModal('opml')}>
-          OPML
-        </button>
-        <a href={api.exportOpmlUrl()} download="flux_rss.opml" style={{ color: 'white', fontSize: 13, textDecoration: 'none' }}>
-          <button className="btn" style={{ color: 'white', borderColor: '#456', background: 'transparent' }}>⬇ Export</button>
+        <button className="btn toolbar-btn" onClick={() => setModal('opml')}>OPML</button>
+        <a href={api.exportOpmlUrl()} download="flux_rss.opml" style={{ textDecoration: 'none' }}>
+          <button className="btn toolbar-btn">⬇ Export</button>
         </a>
         <span className="toolbar-sep" />
         {refreshMsg && <span className="toolbar-status">{refreshMsg}</span>}
       </div>
 
-      {/* Body */}
-      <div className="app-body">
+      {/* Body — data-mobile-view contrôle le panneau visible sur mobile */}
+      <div className="app-body" data-mobile-view={mobileView}>
         <FeedPanel
           feeds={feeds}
           selection={selection}
-          onSelect={setSelection}
+          onSelect={handleFeedSelect}
           onFeedsChange={handleFeedsChange}
           onAddFeed={handleOpenAddFeed}
           onRefreshAll={handleRefreshAll}
@@ -242,18 +249,44 @@ export default function App() {
         <ArticleList
           selection={selection}
           selectedArticleId={selectedArticleId}
-          onArticleSelect={(article) => setSelectedArticleId(article.id)}
+          onArticleSelect={handleArticleSelect}
           onArticlesChange={articleListRefreshRef}
         />
         <ArticleView
           articleId={selectedArticleId}
           onArticleUpdate={handleFeedsChange}
           onTtsTextChange={setTtsText}
+          onBack={() => setMobileView('articles')}
         />
       </div>
 
-      {/* TTS Bar */}
+      {/* TTS Bar — cachée sur mobile portrait */}
       <TTSBar text={ttsText} />
+
+      {/* Barre de navigation mobile (portrait uniquement) */}
+      <nav className="mobile-nav">
+        <button
+          className={mobileView === 'feeds' ? 'active' : ''}
+          onClick={() => setMobileView('feeds')}
+        >
+          <span>📰</span>
+          <small>Flux</small>
+        </button>
+        <button
+          className={mobileView === 'articles' ? 'active' : ''}
+          onClick={() => setMobileView('articles')}
+        >
+          <span>📋</span>
+          <small>Articles</small>
+        </button>
+        <button
+          className={`${mobileView === 'article' ? 'active' : ''} ${!selectedArticleId ? 'dimmed' : ''}`}
+          onClick={() => selectedArticleId && setMobileView('article')}
+        >
+          <span>📄</span>
+          <small>Article</small>
+        </button>
+      </nav>
 
       {/* Modals */}
       {modal === 'add-feed' && (
