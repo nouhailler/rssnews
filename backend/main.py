@@ -1,5 +1,10 @@
 """
 API REST RSS Reader — FastAPI
+
+Règle d'ordre des routes : les routes avec segments LITTÉRAUX
+("/feeds/discover", "/articles/mark-all-read") doivent être déclarées
+AVANT les routes paramétrées ("/feeds/{feed_id}", "/articles/{article_id}")
+pour éviter que Starlette ne tente de parser "discover" comme un entier.
 """
 
 import os
@@ -29,8 +34,13 @@ def startup():
     db.init_db()
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "app": "RSS Reader API"}
+
+
 # ---------------------------------------------------------------------------
-# Flux (feeds)
+# Modèles Pydantic
 # ---------------------------------------------------------------------------
 
 class FeedIn(BaseModel):
@@ -42,6 +52,19 @@ class FeedIn(BaseModel):
 class ActiveIn(BaseModel):
     active: bool
 
+
+class DiscoverIn(BaseModel):
+    url: str
+
+
+class ArticlePatch(BaseModel):
+    read_status: Optional[bool] = None
+    favorite: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
+# Flux — routes LITTÉRALES en premier
+# ---------------------------------------------------------------------------
 
 @app.get("/feeds")
 def list_feeds():
@@ -62,6 +85,27 @@ def create_feed(body: FeedIn):
         raise HTTPException(500, str(e))
     feed = db.get_feed(feed_id)
     feed["unread_count"] = 0
+    return feed
+
+
+# ← Route littérale AVANT les routes paramétrées /feeds/{feed_id}
+@app.post("/feeds/discover")
+def discover_feed(body: DiscoverIn):
+    try:
+        feed_url, feed_title = fetcher.discover_feed_url(body.url)
+        return {"url": feed_url, "title": feed_title}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ← Routes paramétrées après
+@app.get("/feeds/{feed_id}")
+def get_feed(feed_id: int):
+    feed = db.get_feed(feed_id)
+    if not feed:
+        raise HTTPException(404, "Flux introuvable.")
+    unread = db.get_unread_counts_by_feed()
+    feed["unread_count"] = unread.get(feed_id, 0)
     return feed
 
 
@@ -105,7 +149,7 @@ def refresh_feed(feed_id: int):
 
 @app.post("/refresh")
 def refresh_all():
-    """Rafraîchit tous les flux actifs. Peut prendre du temps selon le nombre de flux."""
+    """Rafraîchit tous les flux actifs."""
     report = fetcher.fetch_all_feeds()
     return {
         "total_new": report.total_new,
@@ -123,13 +167,8 @@ def refresh_all():
 
 
 # ---------------------------------------------------------------------------
-# Articles
+# Articles — route littérale AVANT les routes paramétrées
 # ---------------------------------------------------------------------------
-
-class ArticlePatch(BaseModel):
-    read_status: Optional[bool] = None
-    favorite: Optional[bool] = None
-
 
 @app.get("/articles")
 def list_articles(
@@ -149,6 +188,14 @@ def list_articles(
     )
 
 
+# ← Route littérale AVANT /articles/{article_id}
+@app.post("/articles/mark-all-read")
+def mark_all_read(feed_id: Optional[int] = Query(None)):
+    db.mark_all_read(feed_id)
+    return {"ok": True}
+
+
+# ← Routes paramétrées après
 @app.get("/articles/{article_id}")
 def get_article(article_id: int):
     art = db.get_article(article_id)
@@ -167,29 +214,6 @@ def patch_article(article_id: int, body: ArticlePatch):
     if not art:
         raise HTTPException(404, "Article introuvable.")
     return art
-
-
-@app.post("/articles/mark-all-read")
-def mark_all_read(feed_id: Optional[int] = Query(None)):
-    db.mark_all_read(feed_id)
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Découverte de flux
-# ---------------------------------------------------------------------------
-
-class DiscoverIn(BaseModel):
-    url: str
-
-
-@app.post("/feeds/discover")
-def discover_feed(body: DiscoverIn):
-    try:
-        feed_url, feed_title = fetcher.discover_feed_url(body.url)
-        return {"url": feed_url, "title": feed_title}
-    except ValueError as e:
-        raise HTTPException(400, str(e))
 
 
 # ---------------------------------------------------------------------------
