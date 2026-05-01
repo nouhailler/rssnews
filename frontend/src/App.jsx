@@ -251,6 +251,7 @@ export default function App() {
           selectedArticleId={selectedArticleId}
           onArticleSelect={handleArticleSelect}
           onArticlesChange={articleListRefreshRef}
+          onBack={() => setMobileView('feeds')}
         />
         <ArticleView
           articleId={selectedArticleId}

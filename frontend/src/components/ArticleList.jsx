@@ -17,7 +17,7 @@ function formatDate(str) {
   }
 }
 
-export default function ArticleList({ selection, selectedArticleId, onArticleSelect, onArticlesChange }) {
+export default function ArticleList({ selection, selectedArticleId, onArticleSelect, onArticlesChange, onBack }) {
   const [articles, setArticles] = useState([])
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState(false)
@@ -86,6 +86,9 @@ export default function ArticleList({ selection, selectedArticleId, onArticleSel
   return (
     <div className="article-list">
       <div className="article-list-toolbar">
+        {onBack && (
+          <button className="btn icon mobile-back" onClick={onBack} title="Retour aux flux">‹</button>
+        )}
         <input
           type="search"
           placeholder="Rechercher…"
