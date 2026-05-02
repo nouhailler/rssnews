@@ -8,7 +8,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![PyQt6](https://img.shields.io/badge/PyQt6-6.x-41CD52?style=flat-square&logo=qt&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/Licence-MIT-yellow?style=flat-square)
 
 ---
@@ -30,6 +30,8 @@
 # Backend
 cd backend
 pip install -r requirements.txt
+# Définir DATABASE_URL (connection string PostgreSQL/Neon)
+export DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
 uvicorn main:app --reload
 
 # Frontend (dans un autre terminal)
@@ -51,14 +53,15 @@ Ouvrir `http://localhost:5173` — créer un compte et commencer à ajouter des 
 - **Filtres** : tout / non-lus / favoris, recherche plein texte
 - **TTS** : lecture à haute voix via Web Speech API (barre intégrée dans le lecteur)
 - **Import / Export OPML**
-- **Rafraîchissement** : manuel (flux par flux ou tous), par flux individuel
+- **Rafraîchissement** : manuel (flux par flux ou tous les flux actifs)
 
 ### Déploiement
 
 - **Backend** sur [Render](https://render.com) (free tier, `render.yaml` inclus)
   - URL de production : `https://rssnews-bjc6.onrender.com`
-  - DB persistante sur disque Render
-  - Configurer la variable d'env `SECRET_KEY` sur Render
+  - Variables d'env à configurer sur Render :
+    - `SECRET_KEY` — clé de signature JWT (obligatoire)
+    - `DATABASE_URL` — connection string [Neon](https://neon.tech) PostgreSQL
 - **Frontend** sur Netlify ou similaire
   - Variable de build : `VITE_API_URL=https://rssnews-bjc6.onrender.com`
 
@@ -67,7 +70,7 @@ Ouvrir `http://localhost:5173` — créer un compte et commencer à ajouter des 
 ```
 backend/
 ├── main.py          ← Routes REST (auth, feeds, articles, OPML)
-├── database.py      ← SQLite multi-utilisateurs
+├── database.py      ← PostgreSQL multi-utilisateurs (psycopg2)
 ├── auth.py          ← JWT HS256 + bcrypt
 ├── rss_fetcher.py   ← Parsing RSS / OPML
 ├── requirements.txt
@@ -146,6 +149,7 @@ install.sh       ← Installeur Linux
 | `python-jose[cryptography]` | JWT |
 | `bcrypt` | Hash des mots de passe |
 | `python-multipart` | Upload OPML |
+| `psycopg2-binary` | Client PostgreSQL |
 
 ### Desktop
 
