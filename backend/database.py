@@ -1,9 +1,13 @@
 import os
-import sqlite3
 from pathlib import Path
 from datetime import datetime
 
+import libsql_experimental as libsql
 
+TURSO_URL   = os.environ.get("TURSO_DATABASE_URL", "")
+TURSO_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "")
+
+# Fallback local SQLite (développement sans Turso)
 _db_path_env = os.environ.get("RSS_DB_PATH")
 if _db_path_env:
     DB_PATH = Path(_db_path_env)
@@ -13,27 +17,33 @@ else:
     DB_PATH = DB_DIR / "rss_reader.db"
 
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+def _dict_factory(cursor, row):
+    cols = [d[0] for d in cursor.description]
+    return dict(zip(cols, row))
+
+
+def get_connection():
+    if TURSO_URL:
+        conn = libsql.connect(sync_url=TURSO_URL, auth_token=TURSO_TOKEN)
+    else:
+        DB_DIR.mkdir(parents=True, exist_ok=True)
+        conn = libsql.connect(str(DB_PATH))
+    conn.row_factory = _dict_factory
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
 def init_db():
-    DB_DIR.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
+    for stmt in [
+        """CREATE TABLE IF NOT EXISTS users (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             username      TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             created_at    TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS feeds (
+        )""",
+        """CREATE TABLE IF NOT EXISTS feeds (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             name        TEXT NOT NULL,
@@ -44,9 +54,8 @@ def init_db():
             fetch_error TEXT,
             active      INTEGER NOT NULL DEFAULT 1,
             UNIQUE(user_id, url)
-        );
-
-        CREATE TABLE IF NOT EXISTS articles (
+        )""",
+        """CREATE TABLE IF NOT EXISTS articles (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
             feed_id        INTEGER NOT NULL,
             title          TEXT,
@@ -60,14 +69,14 @@ def init_db():
             favorite       INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (feed_id) REFERENCES feeds(id) ON DELETE CASCADE,
             UNIQUE(feed_id, link)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_feeds_user        ON feeds(user_id);
-        CREATE INDEX IF NOT EXISTS idx_articles_feed     ON articles(feed_id);
-        CREATE INDEX IF NOT EXISTS idx_articles_read     ON articles(read_status);
-        CREATE INDEX IF NOT EXISTS idx_articles_favorite ON articles(favorite);
-        CREATE INDEX IF NOT EXISTS idx_articles_date     ON articles(published_date DESC);
-    """)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_feeds_user        ON feeds(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_articles_feed     ON articles(feed_id)",
+        "CREATE INDEX IF NOT EXISTS idx_articles_read     ON articles(read_status)",
+        "CREATE INDEX IF NOT EXISTS idx_articles_favorite ON articles(favorite)",
+        "CREATE INDEX IF NOT EXISTS idx_articles_date     ON articles(published_date DESC)",
+    ]:
+        cursor.execute(stmt)
     conn.commit()
     conn.close()
     _migrate_if_needed()
@@ -77,14 +86,13 @@ def _migrate_if_needed():
     """Migrates pre-auth single-user schema to multi-user schema."""
     conn = get_connection()
     try:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(feeds)").fetchall()]
+        cols = [row["name"] for row in conn.execute("PRAGMA table_info(feeds)").fetchall()]
         if "user_id" in cols:
             return
 
-        # Recreate feeds table: replace global UNIQUE(url) with UNIQUE(user_id, url).
         conn.execute("PRAGMA foreign_keys = OFF")
-        conn.executescript("""
-            CREATE TABLE feeds_migrated (
+        for stmt in [
+            """CREATE TABLE feeds_migrated (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 name        TEXT NOT NULL,
@@ -95,13 +103,14 @@ def _migrate_if_needed():
                 fetch_error TEXT,
                 active      INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(user_id, url)
-            );
-            INSERT INTO feeds_migrated (id, name, url, category, date_added, last_fetch, fetch_error, active)
-            SELECT id, name, url, category, date_added, last_fetch, fetch_error, active FROM feeds;
-            DROP TABLE feeds;
-            ALTER TABLE feeds_migrated RENAME TO feeds;
-            CREATE INDEX IF NOT EXISTS idx_feeds_user ON feeds(user_id);
-        """)
+            )""",
+            """INSERT INTO feeds_migrated (id, name, url, category, date_added, last_fetch, fetch_error, active)
+               SELECT id, name, url, category, date_added, last_fetch, fetch_error, active FROM feeds""",
+            "DROP TABLE feeds",
+            "ALTER TABLE feeds_migrated RENAME TO feeds",
+            "CREATE INDEX IF NOT EXISTS idx_feeds_user ON feeds(user_id)",
+        ]:
+            conn.execute(stmt)
         conn.execute("PRAGMA foreign_keys = ON")
         conn.commit()
     finally:
@@ -149,7 +158,7 @@ def get_user_by_id(user_id: int) -> dict | None:
 def count_users() -> int:
     conn = get_connection()
     try:
-        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        return conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()["cnt"]
     finally:
         conn.close()
 
@@ -158,7 +167,7 @@ def get_first_user_id() -> int | None:
     conn = get_connection()
     try:
         row = conn.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
-        return row[0] if row else None
+        return row["id"] if row else None
     finally:
         conn.close()
 
@@ -167,8 +176,8 @@ def has_orphan_feeds() -> bool:
     conn = get_connection()
     try:
         return conn.execute(
-            "SELECT COUNT(*) FROM feeds WHERE user_id IS NULL"
-        ).fetchone()[0] > 0
+            "SELECT COUNT(*) AS cnt FROM feeds WHERE user_id IS NULL"
+        ).fetchone()["cnt"] > 0
     finally:
         conn.close()
 
@@ -243,7 +252,6 @@ def set_feed_fetch_result(feed_id: int, error: str | None = None):
 
 
 def get_all_feeds(user_id: int | None = None) -> list[dict]:
-    """user_id=None returns ALL feeds (for background refresh); user_id=X filters by user."""
     conn = get_connection()
     try:
         if user_id is not None:
@@ -462,11 +470,11 @@ def import_opml(feeds_list: list[dict], user_id: int) -> int:
     try:
         for f in feeds_list:
             try:
-                conn.execute(
+                cursor = conn.execute(
                     "INSERT OR IGNORE INTO feeds (user_id, name, url, category, date_added) VALUES (?,?,?,?,?)",
                     (user_id, f["name"], f["url"], f.get("category", "Importé"), datetime.now().isoformat()),
                 )
-                if conn.execute("SELECT changes()").fetchone()[0]:
+                if cursor.rowcount > 0:
                     added += 1
             except Exception:
                 pass

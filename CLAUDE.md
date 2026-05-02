@@ -79,6 +79,11 @@ bcrypt.checkpw(plain.encode(), hashed.encode())
 
 ## Base de données web (`backend/database.py`)
 
+- Driver : `libsql-experimental` (libSQL/Turso, compatible SQLite)
+- En production : connexion distante via `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`
+- En dev local : fichier SQLite local (fallback automatique si vars Turso absentes)
+- `row_factory` personnalisé (`_dict_factory`) → les lignes sont des `dict` (pas `sqlite3.Row`)
+
 ### Schéma
 
 ```sql
@@ -121,9 +126,13 @@ articles(id, feed_id FK, title, link, published_date, content, summary,
 ### Backend — Render (free tier)
 
 - URL : `https://rssnews-bjc6.onrender.com`
-- DB persistante sur disque Render : `/data/rss_reader.db`
+- DB hébergée sur **Turso** (libSQL distant) — pas de disque local nécessaire
 - Le service "spin-down" après inactivité → première requête ~30 s
-- Variable d'env **obligatoire** en production : `SECRET_KEY`
+- Variables d'env **obligatoires** en production :
+  - `SECRET_KEY` — clé JWT
+  - `TURSO_DATABASE_URL` — URL libsql://… fournie par Turso
+  - `TURSO_AUTH_TOKEN` — token d'authentification Turso
+- Fallback local (dev) : SQLite dans `~/.local/share/rss-reader/rss_reader.db`
 
 ### Frontend — Netlify (ou similaire)
 
