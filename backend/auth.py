@@ -6,6 +6,8 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
+import database as db
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
@@ -33,6 +35,9 @@ def create_token(user_id: int, username: str) -> str:
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return {"id": int(payload["sub"]), "username": payload["username"]}
+        user_id = int(payload["sub"])
     except (JWTError, KeyError, ValueError):
         raise HTTPException(status_code=401, detail="Token invalide ou expiré.")
+    if not db.get_user_by_id(user_id):
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré.")
+    return {"id": user_id, "username": payload["username"]}
