@@ -1,42 +1,93 @@
-# 📰 RSS Reader — Lecteur de flux RSS pour Linux
+# RSS Reader
 
-> Application de bureau multiplateforme avec interface graphique Qt6, conçue pour Linux.  
-> Créée avec [Claude Code](https://claude.ai/code).
+> Lecteur de flux RSS en deux versions : application de bureau Linux (PyQt6)
+> et application web full-stack (FastAPI + React).
+> Créé avec [Claude Code](https://claude.ai/code).
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![PyQt6](https://img.shields.io/badge/PyQt6-6.x-41CD52?style=flat-square&logo=qt&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)
-![Piper TTS](https://img.shields.io/badge/TTS-Piper-orange?style=flat-square)
 ![License](https://img.shields.io/badge/Licence-MIT-yellow?style=flat-square)
 
 ---
 
-## 📁 Structure du projet
+## Deux versions indépendantes
+
+| Version | Stack | Usage |
+|---------|-------|-------|
+| **Desktop** (`main.py`) | Python + PyQt6 + Piper TTS | Linux uniquement |
+| **Web** (`backend/` + `frontend/`) | FastAPI + React + Web Speech API | Navigateur, mobile |
+
+---
+
+## Version Web
+
+### Démarrage rapide
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+
+# Frontend (dans un autre terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+Ouvrir `http://localhost:5173` — créer un compte et commencer à ajouter des flux.
+
+### Fonctionnalités
+
+- **Authentification multi-utilisateurs** : inscription, connexion (JWT 30 jours),
+  isolation totale des données entre comptes
+- **Gestion des flux** : ajout, modification, suppression, catégories,
+  activation / désactivation, détection automatique de l'URL RSS depuis une page web
+- **Lecture** : interface 3 panneaux (desktop) ou navigation par onglets (mobile),
+  rendu HTML sécurisé, zoom texte, marquer lu/non-lu, favoris
+- **Filtres** : tout / non-lus / favoris, recherche plein texte
+- **TTS** : lecture à haute voix via Web Speech API (barre intégrée dans le lecteur)
+- **Import / Export OPML**
+- **Rafraîchissement** : manuel (flux par flux ou tous), par flux individuel
+
+### Déploiement
+
+- **Backend** sur [Render](https://render.com) (free tier, `render.yaml` inclus)
+  - URL de production : `https://rssnews-bjc6.onrender.com`
+  - DB persistante sur disque Render
+  - Configurer la variable d'env `SECRET_KEY` sur Render
+- **Frontend** sur Netlify ou similaire
+  - Variable de build : `VITE_API_URL=https://rssnews-bjc6.onrender.com`
+
+### Structure
 
 ```
-rss_reader/
-├── main.py              # Point d'entrée
-├── database.py          # Toutes les opérations SQLite
-├── rss_fetcher.py       # Récupération RSS (module principal)
-├── requirements.txt     # PyQt6, feedparser, requests, beautifulsoup4
-├── install.sh           # Script d'installation automatique
-├── tts/
-│   ├── tts_manager.py   # Gestionnaire TTS (Piper + cache audio)
-│   ├── audio_player.py  # Lecture WAV via aplay dans un QThread
-│   └── text_cleaner.py  # Nettoyage HTML → texte propre
-└── ui/
-    ├── __init__.py
-    ├── main_window.py   # Fenêtre 3 panneaux + menus
-    ├── feed_panel.py    # Panneau gauche (arborescence des flux)
-    ├── article_list.py  # Panneau central (liste des articles)
-    ├── article_view.py  # Panneau droit (lecteur d'articles)
-    ├── tts_bar.py       # Barre de contrôle audio (▶ ⏸ ⏹)
-    └── dialogs.py       # Boîtes de dialogue
+backend/
+├── main.py          ← Routes REST (auth, feeds, articles, OPML)
+├── database.py      ← SQLite multi-utilisateurs
+├── auth.py          ← JWT HS256 + bcrypt
+├── rss_fetcher.py   ← Parsing RSS / OPML
+├── requirements.txt
+└── render.yaml      ← Config Render
+
+frontend/src/
+├── App.jsx          ← Auth state, layout
+├── api.js           ← Client HTTP (Bearer token)
+└── components/
+    ├── LoginPage.jsx
+    ├── FeedPanel.jsx
+    ├── ArticleList.jsx
+    └── ArticleView.jsx  ← Lecteur + TTS
 ```
 
 ---
 
-## 🚀 Installation
+## Version Desktop (Linux)
+
+### Installation
 
 ```bash
 git clone https://github.com/nouhailler/rssnews.git
@@ -44,97 +95,70 @@ cd rssnews
 ./install.sh
 ```
 
-Le script installe l'application dans un `venv` isolé et crée un lanceur dans `~/.local/bin/rss-reader`.
-
-### Dépendances système supplémentaires
+Le script crée un `venv` isolé et un lanceur dans `~/.local/bin/rss-reader`.
 
 ```bash
 sudo apt install -y alsa-utils
 pip install piper-tts pathvalidate --break-system-packages
 ```
 
----
+### Fonctionnalités
 
-## 🔊 Lecture à haute voix (TTS offline)
+- Interface **3 panneaux** redimensionnables (flux / articles / lecteur)
+- Rendu HTML sécurisé (sans JavaScript, ressources externes bloquées)
+- Zoom texte, marquer lu/non-lu, favoris, recherche avec debounce
+- Rafraîchissement automatique configurable (5 à 240 min)
+- Import / Export OPML
+- **TTS offline** via [Piper TTS](https://github.com/rhasspy/piper) : lecture à haute voix, pause, stop, vitesse 0.75x–2.0x, cache audio MD5
 
-L'application intègre un module de synthèse vocale **100% offline** basé sur [Piper TTS](https://github.com/rhasspy/piper).
-
-### Installation de la voix française
+#### Installer la voix française (TTS)
 
 ```bash
-mkdir -p ~/.local/share/piper
-cd ~/.local/share/piper
+mkdir -p ~/.local/share/piper && cd ~/.local/share/piper
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json
 ```
 
-### Utilisation
+Dans l'application : cliquer sur ⚙ dans la barre TTS → sélectionner le fichier `.onnx`.
 
-1. Lancer l'application
-2. Cliquer sur ⚙ dans la barre TTS en bas pour sélectionner le modèle `.onnx`
-3. Sélectionner un article
-4. Cliquer sur ▶ pour écouter
+### Structure
 
-### Fonctionnalités TTS
-
-- Lecture complète de l'article (nettoyage HTML automatique)
-- Contrôles : ▶ Play, ⏸ Pause, ⏹ Stop
-- Réglage de la vitesse (0.75x à 2.0x)
-- Cache audio MD5 (`~/.local/share/rss-reader/audio_cache/`) pour éviter de recalculer
-- Traitement dans un thread séparé (non-bloquant)
-- Compatible avec toutes les voix Piper (français, anglais, etc.)
+```
+main.py          ← Point d'entrée
+database.py      ← SQLite local
+rss_fetcher.py   ← Parsing RSS / OPML
+ui/              ← Widgets Qt
+tts/             ← Piper TTS (manager, player, cleaner)
+install.sh       ← Installeur Linux
+```
 
 ---
 
-## ✨ Fonctionnalités
+## Dépendances
 
-### 📡 Gestion des flux
+### Backend web
 
-- Ajouter, modifier et supprimer des flux RSS
-- Organisation par **catégories éditables**
-- Détection automatique du titre RSS lors de l'ajout
-- Activation / désactivation par clic droit
+| Paquet | Rôle |
+|--------|------|
+| `fastapi` + `uvicorn` | Serveur API REST |
+| `feedparser` | Parsing RSS/Atom |
+| `requests` + `beautifulsoup4` | Fetch + nettoyage HTML |
+| `python-jose[cryptography]` | JWT |
+| `bcrypt` | Hash des mots de passe |
+| `python-multipart` | Upload OPML |
 
-### 🔄 Récupération RSS
+### Desktop
 
-- Messages d'erreur précis pour chaque cas :
-  - DNS introuvable, timeout, erreur SSL
-  - HTTP 403 / 404 / 500
-  - XML malformé, URL non-RSS, réponse vide, trop de redirections
-- Rafraîchissement dans un **thread séparé** (non-bloquant)
-- Mise à jour automatique configurable (5 à 240 min)
-- Dialogue de progression avec log détaillé
-
-### 📖 Lecture
-
-- Interface **3 panneaux** redimensionnables
-- Rendu HTML sécurisé (sans JavaScript, ressources externes bloquées)
-- Zoom du texte (A+ / A−)
-- Marquer lu / non-lu, favoris, marquage global
-- Recherche avec debounce 300 ms
-- Ouverture dans le navigateur (`xdg-open`)
-
-### 💾 Import / Export
-
-- Support **OPML** (import et export)
-- Persistance : géométrie de fenêtre, taille des panneaux, préférences
+| Paquet | Rôle |
+|--------|------|
+| `PyQt6` | Interface graphique |
+| `feedparser` | Parsing RSS/Atom |
+| `requests` + `beautifulsoup4` | Fetch + TTS |
+| `piper-tts` | Synthèse vocale offline |
+| `pathvalidate` | Validation des noms de fichiers |
 
 ---
 
-## 🛠️ Dépendances
-
-| Paquet           | Rôle                           |
-|------------------|--------------------------------|
-| `PyQt6`          | Interface graphique            |
-| `feedparser`     | Parsing des flux RSS/Atom      |
-| `requests`       | Requêtes HTTP                  |
-| `beautifulsoup4` | Nettoyage HTML pour le TTS     |
-| `piper-tts`      | Synthèse vocale offline        |
-| `pathvalidate`   | Validation des noms de fichiers|
-| `SQLite3`        | Base de données locale (stdlib)|
-
----
-
-## 📄 Licence
+## Licence
 
 MIT — libre d'utilisation, modification et distribution.
