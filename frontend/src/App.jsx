@@ -175,6 +175,11 @@ export default function App() {
 
   const articleListRefreshRef = useRef(null)
 
+  const loadFeeds = useCallback(async () => {
+    const data = await api.getFeeds()
+    setFeeds(data)
+  }, [])
+
   // Listen for 401 → forced logout
   useEffect(() => {
     const handler = () => setUser(null)
@@ -182,14 +187,10 @@ export default function App() {
     return () => window.removeEventListener('auth:logout', handler)
   }, [])
 
+  // Charge les flux dès qu'un utilisateur est connecté
+  useEffect(() => { if (user) loadFeeds() }, [user, loadFeeds])
+
   if (!user) return <LoginPage onLogin={(u) => setUser(u)} />
-
-  const loadFeeds = useCallback(async () => {
-    const data = await api.getFeeds()
-    setFeeds(data)
-  }, [])
-
-  useEffect(() => { loadFeeds() }, [])
 
   const handleFeedSelect = (sel) => {
     setSelection(sel)

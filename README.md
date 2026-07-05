@@ -22,6 +22,27 @@
 
 ---
 
+## Captures d'écran
+
+> Interface **web** (React). La version desktop (PyQt6) reprend la même
+> disposition en trois panneaux.
+
+**Lecteur — vue desktop** (flux par catégorie · liste d'articles · lecteur avec barre TTS)
+
+![Lecteur web, vue desktop trois panneaux](docs/screenshots/02-reader-desktop.png)
+
+**Connexion multi-utilisateurs**
+
+<img src="docs/screenshots/01-login.png" alt="Page de connexion" width="420">
+
+**Version mobile** (navigation par onglets Flux / Articles / Article)
+
+| Flux par catégorie | Liste d'articles |
+|:---:|:---:|
+| <img src="docs/screenshots/03-mobile-feeds.png" alt="Flux mobile" width="280"> | <img src="docs/screenshots/04-mobile-articles.png" alt="Articles mobile" width="280"> |
+
+---
+
 ## Version Web
 
 ### Démarrage rapide
